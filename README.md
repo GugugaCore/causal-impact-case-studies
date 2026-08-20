@@ -1,87 +1,136 @@
-# Causal Inference Projects
+<div align="center">
 
-Project 1 Background
+# Causal Impact Case Studies
 
-ACME Manufacturing, a company with over 60,000 employees, has launched the Career 2030 training program aimed at fostering the career development of its workforce. Despite its ongoing nature, the initial data from a randomly selected cohort of employees who participated in the training a year earlier has recently become available. ACME's Chief People Officer prioritizes data-informed decision-making and seeks insights into the program's impact on employee promotion and retention.
+**Two applied studies in observational adjustment, instrumental variables, and geo-experiment design.**
 
-Problem
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![R](https://img.shields.io/badge/R-Causal_Modeling-276DC3?logo=r&logoColor=white)](https://www.r-project.org/)
+[![statsmodels](https://img.shields.io/badge/statsmodels-Econometrics-4051B5)](https://www.statsmodels.org/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Case_Studies-F37626?logo=jupyter&logoColor=white)](https://jupyter.org/)
 
-Your analytics consulting group, specializing in causal inference, is one of six firms being considered by ACME to continuously monitor the effects of various employee programs, including Career 2030. As a proof of concept, the client desires a demonstration of your analysis approach, insights derived from the data, and recommendations for program optimization. The dataset provided by the client originates from a randomized controlled trial, where 5% of employees were randomly selected for training while another 5% were not. However, external factors such as interventions by managers and individual motivations may have influenced participation. There were also anecdotal evidence that some managers intervened for direct reports to be part of the program. It is also a fact that some motivated employees may be more interested in the training program as well as upward mobility in their careers. Your task is to analyze this dataset within three weeks, extract insights, and provide actionable recommendations to the client, demonstrating your competence in supporting data-informed decision-making.
+</div>
 
-Available Data
+## Overview
 
-The datasetcomprises 6,000 employee records with the following attributes:
+This repository applies causal-inference methods to two fictional business cases where a simple outcome comparison would be misleading:
 
-empid: Employee ID
+1. **Career 2030 training:** recover an estimate of a professional-development program's effect on promotion after non-compliance and selection compromised the original randomized design.
+2. **Geo marketing holdout:** design and analyze a four-week geographic experiment for a national Google Performance Max campaign using a synthetic-control workflow.
 
-promoted: Whether the employee was promoted within a year of training
+Together, the cases demonstrate covariate balance diagnostics, matching, inverse-probability weighting, instrumental-variable reasoning, treatment-market selection, regularized donor selection, and counterfactual estimation.
 
-training: Participation in the Career 2030 program
+## Findings at a glance
 
-manager: Employee managerial status
+| Case | Design and methods | Recorded result | Interpretation |
+| --- | --- | --- | --- |
+| Employee training | 6,000 employees; 1:1 matching, propensity-score matching, IPTW, IV | IV second-stage coefficient: **about 0.232**; reported `p < 2.2e-16` | Positive exploratory effect, conditional on a debatable exclusion restriction |
+| Geo marketing | Two years of weekly state orders; Lasso-selected synthetic control | Holdout effect: about **-1.45k orders/week**; paired-test `p = 0.00236` | Withholding the campaign was associated with lower orders in the selected markets |
+| National scenario | OLS extrapolation from treatment geos | Modeled four-week loss of about **$155k** without the campaign | Scenario estimate depends on linear extrapolation and cost assumptions |
 
-raise: Merit increase in the last review cycle
+> [!IMPORTANT]
+> These are academic case studies, not production experiments. The employee-training instrument (`disthome`) is statistically related to the outcome in a marginal correlation test (`p = 0.00145`), so the exclusion restriction is not secure. The IV second stage is also fitted with `lm`; exponentiating its coefficient does not turn it into an odds ratio, despite the original report's 1.26x interpretation. The geo notebook records an average effect of `-1454.9` per week, while the report states `-1349.7`; the discrepancy should be resolved before external use.
 
-salary: Employee's salary bracket
+## Analytical workflow
 
-children: Number of children
+```mermaid
+flowchart LR
+    A[Business question] --> B[Assignment mechanism<br/>and causal estimand]
+    B --> C[Data quality and<br/>identification risks]
+    C --> D1[Matching / IPTW / IV]
+    C --> D2[Geo selection /<br/>synthetic control]
+    D1 --> E[Balance, overlap and<br/>assumption checks]
+    D2 --> E
+    E --> F[Treatment-effect<br/>estimation]
+    F --> G[Sensitivity analysis and<br/>business decision]
+```
 
-mstatus: Marital status
+## Case study 1: Career 2030 training
 
-age: Age at promotion
+### Problem
 
-sex: Gender
+The original experiment assigned a small employee cohort to training and control groups, but realized participation no longer resembled clean random assignment. Manager intervention, employee self-selection, attrition, and non-compliance created imbalance between 2,291 trained and 3,709 untrained employees.
 
-edu: Years of education at promotion
+The outcome is promotion within one year. Candidate confounders include role and compensation variables, demographic attributes, benefits participation, test scores, and distance from the training facility.
 
-vacation: Vacation days taken in the year prior to promotion
+### Methods
 
-weight: Weight at the last physical examination
+- **Balance assessment:** propensity-score overlap and standardized mean differences (SMDs).
+- **One-to-one matching:** caliper sensitivity and paired-outcome testing.
+- **Propensity-score matching:** logistic treatment model, 1:1 matching, overlap checks, and McNemar testing.
+- **IPTW:** inverse-probability weights to create a pseudo-population balanced on measured covariates.
+- **Instrumental-variable analysis:** distance from home as the proposed instrument, followed by first- and second-stage regressions.
 
-height: Height at the last physical examination
+### Recorded estimates
 
-hrfriend: Friend within the Human Resources department
+| Method | Reported effect measure | Reported significance | Key concern |
+| --- | ---: | ---: | --- |
+| 1:1 matching | 1.63 | `< 0.001` | Residual imbalance in distance and test score |
+| Propensity-score matching | 2.43 | `< 0.001` | Sensitivity to propensity specification and overlap |
+| IPTW | 1.36 | `< 0.001` | Extreme-weight and model-specification risk |
+| Instrumental variable | 0.232 second-stage coefficient; report converts this to 1.26 | `< 2.2e-16` | Exclusion is uncertain, and exponentiating a linear-model coefficient is not an odds ratio |
 
-cxofriend: C-level friend within the organization
+The estimates agree on direction, but their magnitudes differ. That is useful sensitivity evidence, not proof that every identification strategy is valid.
 
-insurance: Type of insurance coverage
+## Case study 2: Geo marketing holdout
 
-flexspend: Participation in the Flexible Spending Account program
+### Experiment design
 
-retcont: Participation in the 401k retirement saving program
+The analysis selects **Tennessee, Missouri, Montana, and New Mexico** as treatment markets. Delaware is excluded because cross-border exposure could violate consistency, while the final four-state set balances model fit, statistical relevance, national-sales representation, and operational cost.
 
-race: Race
+### Synthetic control
 
-disthome: Distance from training facility to employee's home
+1. Aggregate treatment-market orders for the pre-period.
+2. Exclude treatment markets and other unavailable states from the donor pool.
+3. Use cross-validated Lasso to select **Florida, North Carolina, Ohio, Oregon, Pennsylvania, and Texas**.
+4. Fit a linear model on pre-treatment data.
+5. Predict the counterfactual treatment-market trajectory during the four-week holdout.
+6. Compare observed and predicted orders, then map the local effect to a national scenario.
 
-testscore: Score in a standard test during the recruitment process
+The stored notebook reports a total four-week treatment-market effect of `-5819.6`, or `-1454.9` per week, with a paired-test p-value of `0.00236`. Because treatment is campaign withholding, a negative estimate is consistent with the campaign supporting demand.
 
-Project 2 Background
+## Repository guide
 
-ACME Manufacturing, a leading direct seller of household goods in the US, has a widespread consumer base spanning all 50 states and Washington, DC. Leveraging the success of your consulting group's impactful work on the Career 2030 Impact Project, you've been endorsed by the Chief People Officer to the Chief Marketing Officer. The CMO, in the process of evaluating vendors for marketing effectiveness measurement services, is conducting a "bake-off" among six potential candidates.
+| Path | Purpose |
+| --- | --- |
+| `Cleaning and Matching.ipynb` | R-based balance diagnostics, matching, IPTW, and IV analysis for employee training |
+| `Find treatment-Delaware free .ipynb` | Candidate treatment-market search and geo-selection diagnostics |
+| `Calculate effect.ipynb` | Python synthetic control, treatment-effect calculation, and national extrapolation |
+| `CI Reports/Cleaning and Matching.pdf` | Full Career 2030 analysis and recommendations |
+| `CI Reports/Effect.pdf` | Geo-holdout design, synthetic-control analysis, and campaign scenario |
 
-Problem
+> [!NOTE]
+> Filenames preserve the original submission and commit history. A future refactor can move the notebooks into case-specific directories after adding automated reproduction checks.
 
-Your analytics consulting group, specializing in causal inference, is among the contenders to continuously gauge the effectiveness of ACME's marketing campaigns. As a prerequisite, the client seeks a demonstration of your analytical approach, insights drawn from the data, and recommendations for optimizing marketing campaigns. The dataset spans two years of weekly order data across all 50 US states and Washington, DC. Your objective is to design a four-week experiment to measure the impact of a Google Performance MaxLinks to an external site. marketing campaign on a national scale. However, due to concurrent marketing activities, ACME has specified the candidate treatment markets as follows:
+## Running the notebooks
 
-Delaware
+The raw CSV files are not included. Expected inputs referenced by the notebooks are:
 
-Kansas
+- `TrainingPromoData.csv`
+- `ACMEOrdersData.csv`
+- `orders_treatment_period.csv`
 
-Kentucky
+For the Python notebooks:
 
-Tennessee
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+jupyter lab
+```
 
-Missouri
+For the R notebook, install the packages listed in `R-packages.txt` and use an R-enabled Jupyter kernel.
 
-Montana
+## Limitations and next steps
 
-Arkansas
+- The source data is unavailable, so the recorded outputs cannot be reproduced from this repository alone.
+- Statistical significance does not validate matching quality or causal assumptions.
+- The proposed IV has evidence against a strict exclusion restriction and needs stronger domain justification or a different instrument.
+- The geo paired t-test uses only four treatment weeks; placebo periods, permutation inference, and pre-period RMSPE comparisons would be more credible.
+- The synthetic-control implementation uses Lasso for donor selection followed by unconstrained linear regression rather than canonical non-negative, sum-to-one weights.
+- National extrapolation assumes a stable linear relationship between the four treatment geos and total orders.
+- A production version should define estimands up front, separate design from outcome analysis, add placebo and falsification tests, and track all scenario assumptions explicitly.
 
-Mississippi
+## Project context and attribution
 
-New Mexico
-
-Furthermore, these candidate markets cannot be utilized as control markets.
-
-You have a timeframe of 10 days to design a geo holdout experiment. Once the treatment markets are identified, the client will disclose the observed orders in these markets over the course of four weeks. Your task involves analyzing the data, crafting an experiment, implementing causal inference techniques to derive insights, and delivering actionable recommendations. This showcases your proficiency in facilitating data-informed decision-making.
+These projects were completed as academic team case studies. The Career 2030 report lists Lanston Chen, Wenxi Xu, Icy Wang, Yihua Wang, and Yizhou Sun as contributors. The repository preserves the original reports and notebooks while adding a more transparent portfolio-level interpretation.
